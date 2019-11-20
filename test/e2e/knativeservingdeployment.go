@@ -31,7 +31,9 @@ import (
 	"knative.dev/serving-operator/test/resources"
 )
 
-func testKnativeServingDeployment(t *testing.T) {
+func testKnativeServingDeployment(ctx *test.Context) {
+	t := ctx.T()
+	r := ctx.Runner()
 	cancel := logstream.Start(t)
 	defer cancel()
 	clients := Setup(t)
@@ -50,23 +52,23 @@ func testKnativeServingDeployment(t *testing.T) {
 	}
 
 	// Test if KnativeServing can reach the READY status
-	t.Run("create", func(t *testing.T) {
+	r.Run("create", func(t *testing.T) {
 		knativeServingVerify(t, clients, names)
 	})
 
-	t.Run("configure", func(t *testing.T) {
+	r.Run("configure", func(t *testing.T) {
 		knativeServingVerify(t, clients, names)
 		knativeServingConfigure(t, clients, names)
 	})
 
 	// Delete the deployments one by one to see if they will be recreated.
-	t.Run("restore", func(t *testing.T) {
+	r.Run("restore", func(t *testing.T) {
 		knativeServingVerify(t, clients, names)
 		deploymentRecreation(t, clients, names)
 	})
 
 	// Delete the KnativeServing to see if all the deployments will be removed as well
-	t.Run("delete", func(t *testing.T) {
+	r.Run("delete", func(t *testing.T) {
 		knativeServingVerify(t, clients, names)
 		knativeServingDeletion(t, clients, names)
 		verifyClusterResourceDeletion(t, clients)
@@ -191,6 +193,8 @@ func knativeServingDeletion(t *testing.T, clients *test.Clients, names test.Reso
 		}
 		t.Logf("The deployment %s/%s has been deleted.", deployment.Namespace, deployment.Name)
 	}
+
+	waitForNoKnativeServings(t, clients)
 }
 
 func verifyClusterResourceDeletion(t *testing.T, clients *test.Clients) {
@@ -219,6 +223,21 @@ func verifyClusterResourceDeletion(t *testing.T, clients *test.Clients) {
 			t.Logf("The %s %s has been deleted.", u.GetKind(), u.GetName())
 		}
 	}
+}
+
+func waitForNoKnativeServings(t *testing.T, clients *test.Clients) {
+	t.Log("Waiting for knative-serving cr(s) to not be present")
+	waitErr := wait.PollImmediate(resources.Interval, resources.Timeout, func() (bool, error) {
+		list, err := clients.KnativeServingAll().List(metav1.ListOptions{})
+		if apierrs.IsNotFound(err) || len(list.Items) == 0 {
+			return true, nil
+		}
+		return false, err
+	})
+	if waitErr != nil {
+		t.Fatalf("At least one knative-serving cr is still present after timeout was reached: %v", waitErr)
+	}
+	t.Log("No knative-serving cr is present")
 }
 
 func verifyNoKnativeServings(clients *test.Clients) error {

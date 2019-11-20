@@ -11,18 +11,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package test
 
-import "knative.dev/serving-operator/test"
+import "testing"
 
-/**
-ComplianceSuite can be executed by productized code's test plan to assert
-compliance with upstream knative
-*/
-func ComplianceSuite() []test.Specification {
-	return suite
+// Runner is a test runner that takes a context into consideration
+type Runner interface {
+	Run(name string, testfunc func(t *testing.T)) bool
 }
 
-var suite = []test.Specification{
-	test.NewContextualSpec("TestKnativeServingDeployment", testKnativeServingDeployment),
+func (spec Specification) run(ctx *Context) bool {
+	tt := ctx.t
+	if spec.contextual() {
+		cspec := spec.contextSpec
+		return tt.Run(cspec.name, func(t *testing.T) {
+			ctx.t = t
+			ctx.push(cspec.name)
+			defer ctx.pop()
+			cspec.testfunc(ctx)
+		})
+	} else {
+		return tt.Run(spec.regularSpec.name, spec.regularSpec.testfunc)
+	}
 }

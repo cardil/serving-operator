@@ -16,10 +16,12 @@ limitations under the License.
 package e2e
 
 import (
+	"knative.dev/serving-operator/test"
 	"testing"
 )
 
 // TestKnativeServingDeployment verifies the KnativeServing creation, deployment recreation, and KnativeServing deletion.
 func TestKnativeServingDeployment(t *testing.T) {
-	testKnativeServingDeployment(t)
+	ctx := test.NewContext(t)
+	testKnativeServingDeployment(ctx)
 }
