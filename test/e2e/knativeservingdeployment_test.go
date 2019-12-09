@@ -194,6 +194,8 @@ func knativeServingDeletion(t *testing.T, clients *test.Clients, names test.Reso
 		}
 		t.Logf("The deployment %s/%s has been deleted.", deployment.Namespace, deployment.Name)
 	}
+
+	waitForNoKnativeServings(t, clients)
 }
 
 func verifyClusterResourceDeletion(t *testing.T, clients *test.Clients) {
@@ -222,6 +224,21 @@ func verifyClusterResourceDeletion(t *testing.T, clients *test.Clients) {
 			t.Logf("The %s %s has been deleted.", u.GetKind(), u.GetName())
 		}
 	}
+}
+
+func waitForNoKnativeServings(t *testing.T, clients *test.Clients) {
+	t.Log("Waiting for knative-serving cr(s) to not be present")
+	waitErr := wait.PollImmediate(resources.Interval, resources.Timeout, func() (bool, error) {
+		list, err := clients.KnativeServingAll().List(metav1.ListOptions{})
+		if apierrs.IsNotFound(err) || len(list.Items) == 0 {
+			return true, nil
+		}
+		return false, err
+	})
+	if waitErr != nil {
+		t.Fatalf("At least one knative-serving cr is still present after timeout was reached: %v", waitErr)
+	}
+	t.Log("No knative-serving cr is present")
 }
 
 func verifyNoKnativeServings(clients *test.Clients) error {
